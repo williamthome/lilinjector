@@ -1,0 +1,5 @@
+/.vscode
+/@types
+/coverage
+/lib
+/node_modules
