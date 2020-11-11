@@ -8,7 +8,7 @@ beforeEach(() => {
   container.clear()
 })
 
-describe('Heinjector', () => {
+describe('LiliNjector', () => {
   describe('bind()', () => {
     it('should bind identifiers', () => {
       container.bind(0).as(0).done()

@@ -21,7 +21,7 @@ export const Inject = <T extends Record<string, any> | Newable<T>> (container: C
 
     Object.defineProperty(parameterIndex !== undefined ? (target as Newable<T>).prototype : target, key, {
       get: () => container.resolve(identifier || key),
-      set: () => new Error(`[HeinJector] Property ${key.toString()} for ${target} is readonly`)
+      set: () => new Error(`[LiliNjector] Property ${key.toString()} for ${target} is readonly`)
     })
   }
 }

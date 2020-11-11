@@ -1,10 +1,10 @@
 {
-  "name": "heinjector",
-  "version": "0.0.5",
+  "name": "lilinjector",
+  "version": "0.0.1",
   "description": "Simple dependency injector",
   "repository": {
     "type": "git",
-    "url": "https://github.com/williamthome/heinjector.git"
+    "url": "https://github.com/williamthome/lilinjector.git"
   },
   "main": "lib/index.js",
   "types": "lib/index.d.ts",

@@ -9,7 +9,7 @@ export class Container {
 
   bind = <I, P> (identifier: Identifier<I>): BindConfig<I, P> => {
     if (this._registry.has(identifier))
-      throw new Error(`[HeinJector] Identifier ${identifier.toString()} already registered`)
+      throw new Error(`[LiliNjector] Identifier ${identifier.toString()} already registered`)
 
     const payload: Payload<P> = { noCache: false, singleton: true }
     this._registry.set(identifier, payload)
@@ -99,7 +99,7 @@ export class Container {
 
   private _getPayloadOrThrow = <I, P> (identifier: Identifier<I>): Payload<P> => {
     const registered = this._registry.get(identifier)
-    if (!registered) throw new Error(`[HeinJector] Identifier ${identifier.toString()} not in registry`)
+    if (!registered) throw new Error(`[LiliNjector] Identifier ${identifier.toString()} not in registry`)
     return registered
   }
 
