@@ -18,19 +18,22 @@ interface Payload<P> {
   singleton: boolean
 }
 
-type PayloadReturnType = 'newable' | 'factory' | 'value' | 'array'
+type PayloadReturnType = 'newable' | 'factory' | 'value' | 'array' | 'cache'
 
 class SaveConfig<I, P> {
   constructor (
     private readonly container: Container,
     private readonly identifier: Identifier<I>,
     private readonly payload: Payload<P>,
-    private readonly overrideRegistry: boolean
+    private readonly overrideRegistry: boolean,
+    private readonly newCache?: P | P[]
   ) { }
 
   save = (): void => {
-    if (this.overrideRegistry)
+    if (this.overrideRegistry) {
+      if (this.newCache) this.payload.cache = this.newCache
       this.container.override(this.identifier, this.payload)
+    }
   }
 }
 
@@ -44,7 +47,7 @@ class SingletonConfig<I, P> {
 
   notInSingletonScope = (): void => {
     this.payload.singleton = false
-    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry)
+    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry).save()
   }
 }
 
@@ -59,7 +62,7 @@ class ArrayConfig<I, P> {
 
   override = (): void => {
     this.payload.array = this.newValues
-    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry)
+    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry, this.newValues).save()
   }
 }
 
@@ -73,24 +76,30 @@ class Bind<I, P> {
 
   asNewable = (newable: Newable<P>): SingletonConfig<I, P> => {
     this.payload.newable = newable
-    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry)
+    this.save()
     return new SingletonConfig<I, P>(this.container, this.identifier, this.payload, this.overrideRegistry)
   }
 
   asFactory = (factory: Factory<P>): SingletonConfig<I, P> => {
     this.payload.factory = factory
-    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry)
+    this.save()
     return new SingletonConfig<I, P>(this.container, this.identifier, this.payload, this.overrideRegistry)
   }
 
   as = (value: P): void => {
     this.payload.value = value
+    this.save(value)
   }
 
   asArray = (...array: P[]): ArrayConfig<I, P> => {
+    const newArray = [...this.payload.array || [], ...array]
     this.payload.array = [...this.payload.array || [], ...array]
-    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry)
+    this.save(newArray)
     return new ArrayConfig<I, P>(this.container, this.identifier, this.payload, array, this.overrideRegistry)
+  }
+
+  private save = (newCache?: P | P[]): void => {
+    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry, newCache).save()
   }
 }
 
@@ -141,13 +150,15 @@ class Container {
     const { newable, factory, value, array, cache, singleton } = registered
 
     const cacheItem = (creator: Factory<P>): P => {
-      if (singleton && cache) return cache
       if (!singleton) return creator()
       registered.cache = creator()
       return registered.cache
     }
 
     switch (payloadReturnType) {
+      case 'cache':
+        if (cache !== undefined) return cache
+        break
       case 'value':
         if (value !== undefined) return value
         break
@@ -161,19 +172,19 @@ class Container {
         if (factory !== undefined) cacheItem(() => factory())
         break
       default:
+        if (singleton && cache !== undefined) return cache
         if (value !== undefined) return value
         if (array !== undefined) return array
         if (newable !== undefined) return cacheItem(() => new newable())
         if (factory !== undefined) cacheItem(() => factory())
     }
 
-    throw new Error(`Payload for ${identifier.toString()} is null`)
+    throw new Error(`Payload for identifier ${identifier.toString()} is null`)
   }
 
   private _add = <I, P> (identifier: Identifier<I>): Payload<P> => {
-    if (this._registry.has(identifier)) {
+    if (this._registry.has(identifier))
       throw new Error(`Identifier ${identifier.toString()} already registered`)
-    }
 
     const payload: Payload<P> = { singleton: true }
     this._registry.set(identifier, payload)
