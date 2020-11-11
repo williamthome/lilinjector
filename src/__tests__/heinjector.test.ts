@@ -1,8 +1,6 @@
-type Any = Record<PropertyKey, any>
 type Factory<P> = () => P
 type Newable<P> = new (...args: any[]) => P
 type Identifier<I> = PropertyKey | Newable<I>
-type Value<P> = P | P[] | undefined
 type Registry<I = unknown, P = any> = Map<Identifier<I>, Payload<P>>
 type PayloadReturnType =
   | 'value'
@@ -10,11 +8,6 @@ type PayloadReturnType =
   | 'newable'
   | 'factory'
   | 'cache'
-
-interface Property<P> {
-  name: PropertyKey
-  value: Value<P>
-}
 
 interface Payload<P> {
   value?: P
