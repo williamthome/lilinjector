@@ -1,7 +1,9 @@
-type Factory<P> = () => P
-type Newable<P> = new (...args: any[]) => P
 type Identifier<I> = PropertyKey | Newable<I>
-type Registry<I = unknown, P = any> = Map<Identifier<I>, Payload<P>>
+type RegistryMap<I = unknown, P = any> = Map<Identifier<I>, Payload<P>>
+
+type Newable<P> = new (...args: any[]) => P
+type Factory<P> = () => P
+
 type PayloadReturnType =
   | 'value'
   | 'array'
@@ -33,38 +35,37 @@ class BaseConfig<I, P> {
 class DoneConfig<I, P> extends BaseConfig<I, P> {
   done = (): void => {
     const { newValue, payload, container, identifier } = this.config
-
     if (newValue && !payload.noCache) payload.cache = newValue
     else if (newValue === null && payload.cache) delete payload.cache
     container.override(identifier, payload)
   }
 }
 
-class Config<I, P> extends DoneConfig<I, P> {
-  notInSingletonScope = (): Config<I, P> => {
+class ObjectConfig<I, P> extends DoneConfig<I, P> {
+  notInSingletonScope = (): ObjectConfig<I, P> => {
     this.config.payload.singleton = false
     return this
   }
 
-  noCache = (): Config<I, P> => {
+  noCache = (): ObjectConfig<I, P> => {
     this.config.payload.noCache = true
     return this
   }
 }
 
-class ArrayConfig<I, P> extends Config<I, P> {
-  override = (): Config<I, P> => {
+class ArrayConfig<I, P> extends ObjectConfig<I, P> {
+  override = (): ObjectConfig<I, P> => {
     this.config.payload.array = this.config.args
     return this
   }
 }
 
-class Bind<I, P> extends BaseConfig<I, P> {
-  as = (value: P): Config<I, P> => {
+class BindConfig<I, P> extends BaseConfig<I, P> {
+  as = (value: P): ObjectConfig<I, P> => {
     this.config.oldValue = this.config.payload.value
     this.config.payload.value = value
     this.config.newValue = value
-    return new Config<I, P>(this.config)
+    return new ObjectConfig<I, P>(this.config)
   }
 
   asArray = (...array: P[]): ArrayConfig<I, P> => {
@@ -76,59 +77,52 @@ class Bind<I, P> extends BaseConfig<I, P> {
     return new ArrayConfig<I, P>(this.config)
   }
 
-  asNewable = (newable: Newable<P>): Config<I, P> => {
+  asNewable = (newable: Newable<P>): ObjectConfig<I, P> => {
     this.config.oldValue = this.config.payload.value
     this.config.payload.newable = newable
     this.config.newValue = null
-    return new Config<I, P>(this.config)
+    return new ObjectConfig<I, P>(this.config)
   }
 
-  asFactory = (factory: Factory<P>): Config<I, P> => {
+  asFactory = (factory: Factory<P>): ObjectConfig<I, P> => {
     this.config.oldValue = this.config.payload.value
     this.config.payload.factory = factory
     this.config.newValue = null
-    return new Config<I, P>(this.config)
+    return new ObjectConfig<I, P>(this.config)
   }
 }
 
 class Container {
-  private _registry: Registry = new Map()
-  private _snapshots: Registry[] = []
+  private _registry: RegistryMap = new Map()
+  private _snapshots: RegistryMap[] = []
 
-  bind = <I, P> (identifier: Identifier<I>): Bind<I, P> => {
+  bind = <I, P> (identifier: Identifier<I>): BindConfig<I, P> => {
     if (this._registry.has(identifier))
       throw new Error(`[HeinJector] Identifier ${identifier.toString()} already registered`)
 
     const payload: Payload<P> = { noCache: false, singleton: true }
     this._registry.set(identifier, payload)
 
-    return new Bind<I, P>({
-      container: this,
-      identifier,
-      payload
-    })
+    return this._makeBindConfig<I, P>(identifier, payload)
   }
 
   unbind = <I, P> (identifier: Identifier<I>): Container => {
-    this.get<I, P>(identifier)
+    this._getPayloadOrThrow<I, P>(identifier)
     this._registry.delete(identifier)
     return this
   }
 
-  rebind = <I, P> (identifier: Identifier<I>): Bind<I, P> => {
+  rebind = <I, P> (identifier: Identifier<I>): BindConfig<I, P> => {
     return this.unbind<I, P>(identifier).bind<I, P>(identifier)
   }
 
-  define = <I, P> (identifier: Identifier<I>): Bind<I, P> => {
-    return new Bind<I, P>({
-      container: this,
-      identifier,
-      payload: this.getPayloadOrThrow<I, P>(identifier)
-    })
+  define = <I, P> (identifier: Identifier<I>): BindConfig<I, P> => {
+    const payload = this._getPayloadOrThrow<I, P>(identifier)
+    return this._makeBindConfig<I, P>(identifier, payload)
   }
 
   override = <I, P> (identifier: Identifier<I>, payload: Payload<P>): Container => {
-    this.get<I, P>(identifier)
+    this._getPayloadOrThrow<I, P>(identifier)
     this._registry.set(identifier, payload)
     return this
   }
@@ -148,14 +142,8 @@ class Container {
     return this
   }
 
-  private getPayloadOrThrow = <I, P> (identifier: Identifier<I>): Payload<P> => {
-    const registered = this._registry.get(identifier)
-    if (!registered) throw new Error(`[HeinJector] Identifier ${identifier.toString()} not in registry`)
-    return registered
-  }
-
-  get = <I, P> (identifier: Identifier<I>, payloadReturnType?: PayloadReturnType): P | P[] => {
-    const registered = this.getPayloadOrThrow<I, P>(identifier)
+  resolve = <I, P> (identifier: Identifier<I>, payloadReturnType?: PayloadReturnType): P | P[] => {
+    const registered = this._getPayloadOrThrow<I, P>(identifier)
 
     const { value, array, newable, factory, cache, noCache, singleton } = registered
 
@@ -193,21 +181,26 @@ class Container {
 
     throw new Error(`Payload for identifier ${identifier.toString()} is null`)
   }
-}
 
-const createResolve = (container: Container) => {
-  return <I, P> (identifier: Identifier<I>) => {
-    let value: P | P[]
-    return (): P | P[] => {
-      if (value === undefined)
-        value = container.get<I, P>(identifier)
+  createInjectDecorator = <T> (identifier?: Identifier<T>) => InjectDecorator(this, identifier)
 
-      return value
-    }
+  createInjectableDecorator = <T> (identifier?: Identifier<T>) => InjectableDecorator(this, identifier)
+
+  private _getPayloadOrThrow = <I, P> (identifier: Identifier<I>): Payload<P> => {
+    const registered = this._registry.get(identifier)
+    if (!registered) throw new Error(`[HeinJector] Identifier ${identifier.toString()} not in registry`)
+    return registered
   }
+
+  private _makeBindConfig = <I, P> (identifier: Identifier<I>, payload: Payload<P>): BindConfig<I, P> =>
+    new BindConfig<I, P>({
+      container: this,
+      identifier,
+      payload
+    })
 }
 
-export const getArgumentNames = <T> (newable: Newable<T>): string[] => {
+const getArgumentNames = <T> (newable: Newable<T>): string[] => {
   const RegExInsideParentheses = /[(][^)]*[)]/
   const RegExParenthesesAndSpaces = /[()\s]/g
   const regExValue = RegExInsideParentheses.exec(newable.toString())
@@ -226,12 +219,11 @@ const InjectDecorator = <T extends Record<string, any> | Newable<T>> (container:
     container.bind(identifier || key)
 
     Object.defineProperty(parameterIndex !== undefined ? (target as Newable<T>).prototype : target, key, {
-      get: () => container.get(identifier || key),
+      get: () => container.resolve(identifier || key),
       set: () => new Error(`[HeinJector] Property ${key.toString()} for ${target} is readonly`)
     })
   }
 }
-const createInject = <T> (container: Container) => (identifier?: Identifier<T>) => InjectDecorator(container, identifier)
 
 const InjectableDecorator = <T extends Record<string, any>> (container: Container, identifier?: Identifier<T>) => {
   return <T extends Newable<any>> (
@@ -241,12 +233,10 @@ const InjectableDecorator = <T extends Record<string, any>> (container: Containe
     return target
   }
 }
-const createInjectable = <T> (container: Container) => (identifier?: Identifier<T>) => InjectableDecorator(container, identifier)
 
 const container = new Container()
-const resolve = createResolve(container)
-const Inject = createInject(container)
-const Injectable = createInjectable(container)
+const Inject = container.createInjectDecorator
+const Injectable = container.createInjectableDecorator
 
 beforeEach(() => {
   container.clear()
@@ -256,11 +246,11 @@ describe('Heinjector', () => {
   describe('bind()', () => {
     it('should bind identifiers', () => {
       container.bind(0).as(0).done()
-      const zero = container.get(0)
+      const zero = container.resolve(0)
       expect(zero).toBe(0)
 
       container.bind('array').asArray(0, 1, 2).done()
-      const array = container.get('array')
+      const array = container.resolve('array')
       expect(array).toEqual([0, 1, 2])
     })
   })
@@ -270,18 +260,18 @@ describe('Heinjector', () => {
       container.bind(0).as(0).done()
       container.unbind(0)
 
-      expect(() => container.get(0)).toThrow()
+      expect(() => container.resolve(0)).toThrow()
     })
   })
 
   describe('rebind()', () => {
     it('should rebind identifier', () => {
       container.bind(0).as(0).done()
-      let zero = container.get(0)
+      let zero = container.resolve(0)
       expect(zero).toBe(0)
 
       container.rebind(0).asArray(0, 0, 0).done()
-      zero = container.get(0)
+      zero = container.resolve(0)
       expect(zero).toEqual([0, 0, 0])
     })
   })
@@ -289,31 +279,31 @@ describe('Heinjector', () => {
   describe('define()', () => {
     it('should define values', () => {
       container.bind('foo').as('foo').done()
-      let foo = container.get('foo')
+      let foo = container.resolve('foo')
       expect(foo).toBe('foo')
 
       container.define('foo').as('bar').done()
-      foo = container.get('foo')
+      foo = container.resolve('foo')
       expect(foo).toBe('bar')
     })
 
     it('should push to array', () => {
       container.bind('foo').asArray('foo').done()
-      let foo = container.get('foo')
+      let foo = container.resolve('foo')
       expect(foo).toEqual(['foo'])
 
       container.define('foo').asArray('bar').done()
-      foo = container.get('foo')
+      foo = container.resolve('foo')
       expect(foo).toEqual(['foo', 'bar'])
     })
 
     it('should override array', () => {
       container.bind('foo').asArray('foo').noCache().done()
-      let foo = container.get('foo')
+      let foo = container.resolve('foo')
       expect(foo).toEqual(['foo'])
 
       container.define('foo').asArray('bar').override().done()
-      foo = container.get('foo')
+      foo = container.resolve('foo')
       expect(foo).toEqual(['bar'])
     })
   })
@@ -321,7 +311,7 @@ describe('Heinjector', () => {
   describe('resolve()', () => {
     it('should resolve', () => {
       container.bind('Foo').asNewable(class { public foo = 'foo' })
-      expect(resolve<string, any>('Foo')().foo).toBe('foo')
+      expect(container.resolve<string, any>('Foo').foo).toBe('foo')
     })
   })
 
@@ -337,7 +327,7 @@ describe('Heinjector', () => {
         public foo!: string
       }
 
-      const foo = resolve<Foo, Foo>(Foo)() as Foo
+      const foo = container.resolve<Foo, Foo>(Foo) as Foo
 
       container.define('foo').as('MyFooValue').done()
       expect(foo.foo).toBe('MyFooValue')
