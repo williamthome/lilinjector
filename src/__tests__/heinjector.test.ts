@@ -73,6 +73,19 @@ class Container {
     return new Bind(this._add<I, P>(identifier))
   }
 
+  unbind = <I> (identifier: Identifier<I>): Container => {
+    if (!this._registry.has(identifier))
+      throw new Error(`Identifier ${identifier.toString()} not in registry`)
+
+    this._registry.delete(identifier)
+
+    return this
+  }
+
+  rebind = <I, P> (identifier: Identifier<I>): Bind<P> => {
+    return this.unbind<I>(identifier).bind<I, P>(identifier)
+  }
+
   get = <T> (identifier: Identifier<T>, payloadReturnType?: PayloadReturnType): T | T[] => {
     const registered = this._registry.get(identifier)
 
@@ -135,6 +148,18 @@ describe('Heinjector', () => {
       container.bind('array').asArray(0, 1, 2)
       const array = container.get('array')
       expect(array).toEqual([0, 1, 2])
+    })
+
+    it('should rebind identifier', () => {
+      const container = new Container()
+
+      container.bind(0).as(0)
+      let zero = container.get(0)
+      expect(zero).toBe(0)
+
+      container.rebind(0).asArray(0, 0, 0)
+      zero = container.get(0)
+      expect(zero).toEqual([0, 0, 0])
     })
   })
 })
