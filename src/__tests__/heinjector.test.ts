@@ -16,7 +16,7 @@ describe('LiliNjector', () => {
       expect(zero).toBe(0)
 
       container.bind('array').asArray(0, 1, 2).done()
-      const array = container.resolve('array')
+      const array = container.resolveArray('array')
       expect(array).toEqual([0, 1, 2])
     })
   })
@@ -37,7 +37,7 @@ describe('LiliNjector', () => {
       expect(zero).toBe(0)
 
       container.rebind(0).asArray(0, 0, 0).done()
-      zero = container.resolve(0)
+      zero = container.resolveArray(0)
       expect(zero).toEqual([0, 0, 0])
     })
   })
@@ -55,21 +55,21 @@ describe('LiliNjector', () => {
 
     it('should push to array', () => {
       container.bind('foo').asArray('foo').done()
-      let foo = container.resolve('foo')
+      let foo = container.resolveArray('foo')
       expect(foo).toEqual(['foo'])
 
       container.define('foo').asArray('bar').done()
-      foo = container.resolve('foo')
+      foo = container.resolveArray('foo')
       expect(foo).toEqual(['foo', 'bar'])
     })
 
     it('should override array', () => {
       container.bind('foo').asArray('foo').noCache().done()
-      let foo = container.resolve('foo')
+      let foo = container.resolveArray('foo')
       expect(foo).toEqual(['foo'])
 
       container.define('foo').asArray('bar').override().done()
-      foo = container.resolve('foo')
+      foo = container.resolveArray('foo')
       expect(foo).toEqual(['bar'])
     })
   })
@@ -93,7 +93,7 @@ describe('LiliNjector', () => {
         public foo!: string
       }
 
-      const foo = container.resolve<Foo, Foo>(Foo) as Foo
+      const foo = container.resolve<Foo, Foo>(Foo)
 
       container.define('foo').as('MyFooValue').done()
       expect(foo.foo).toBe('MyFooValue')
