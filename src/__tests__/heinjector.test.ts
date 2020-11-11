@@ -93,7 +93,7 @@ describe('LiliNjector', () => {
         public foo!: string
       }
 
-      const foo = container.resolve<Foo, Foo>(Foo)
+      const foo = container.resolve(Foo)
 
       container.define('foo').as('MyFooValue').done()
       expect(foo.foo).toBe('MyFooValue')

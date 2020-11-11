@@ -56,21 +56,21 @@ export class Container {
     return this
   }
 
-  resolve = <I, P> (identifier: Identifier<I>, payloadReturnType?: PayloadReturnType): P => {
+  resolve = <I, P = I> (identifier: Identifier<I>, payloadReturnType?: PayloadReturnType): P => {
     const resolved = this.resolveAny<I, P>(identifier, payloadReturnType)
     if (Array.isArray(resolved))
       throw new Error(`[LiliNjector] Payload for idenifier ${identifier.toString()} is instance of array`)
     return resolved
   }
 
-  resolveArray = <I, P> (identifier: Identifier<I>, payloadReturnType?: PayloadReturnType): P[] => {
+  resolveArray = <I, P = I> (identifier: Identifier<I>, payloadReturnType?: PayloadReturnType): P[] => {
     const resolved = this.resolveAny<I, P>(identifier, payloadReturnType)
     if (!Array.isArray(resolved))
       throw new Error(`[LiliNjector] Payload for idenifier ${identifier.toString()} isn't instance of array`)
     return resolved
   }
 
-  resolveAny = <I, P> (identifier: Identifier<I>, payloadReturnType?: PayloadReturnType): P | P[] => {
+  resolveAny = <I, P = I> (identifier: Identifier<I>, payloadReturnType?: PayloadReturnType): P | P[] => {
     const registered = this._getPayloadOrThrow<I, P>(identifier)
 
     const { value, array, newable, factory, cache, noCache, singleton } = registered
