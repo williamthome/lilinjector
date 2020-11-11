@@ -10,15 +10,20 @@ interface Property<P> {
 }
 
 interface Payload<P> {
-  newable?: Newable<P>
-  factory?: Factory<P>
   value?: P
   array?: P[]
+  newable?: Newable<P>
+  factory?: Factory<P>
   cache?: P | P[]
   singleton: boolean
 }
 
-type PayloadReturnType = 'newable' | 'factory' | 'value' | 'array' | 'cache'
+type PayloadReturnType =
+  | 'value'
+  | 'array'
+  | 'newable'
+  | 'factory'
+  | 'cache'
 
 class SaveConfig<I, P> {
   constructor (
@@ -74,18 +79,6 @@ class Bind<I, P> {
     private readonly overrideRegistry = false
   ) { }
 
-  asNewable = (newable: Newable<P>): SingletonConfig<I, P> => {
-    this.payload.newable = newable
-    this.save()
-    return new SingletonConfig<I, P>(this.container, this.identifier, this.payload, this.overrideRegistry)
-  }
-
-  asFactory = (factory: Factory<P>): SingletonConfig<I, P> => {
-    this.payload.factory = factory
-    this.save()
-    return new SingletonConfig<I, P>(this.container, this.identifier, this.payload, this.overrideRegistry)
-  }
-
   as = (value: P): void => {
     this.payload.value = value
     this.save(value)
@@ -96,6 +89,18 @@ class Bind<I, P> {
     this.payload.array = [...this.payload.array || [], ...array]
     this.save(newArray)
     return new ArrayConfig<I, P>(this.container, this.identifier, this.payload, array, this.overrideRegistry)
+  }
+
+  asNewable = (newable: Newable<P>): SingletonConfig<I, P> => {
+    this.payload.newable = newable
+    this.save()
+    return new SingletonConfig<I, P>(this.container, this.identifier, this.payload, this.overrideRegistry)
+  }
+
+  asFactory = (factory: Factory<P>): SingletonConfig<I, P> => {
+    this.payload.factory = factory
+    this.save()
+    return new SingletonConfig<I, P>(this.container, this.identifier, this.payload, this.overrideRegistry)
   }
 
   private save = (newCache?: P | P[]): void => {
@@ -156,9 +161,6 @@ class Container {
     }
 
     switch (payloadReturnType) {
-      case 'cache':
-        if (cache !== undefined) return cache
-        break
       case 'value':
         if (value !== undefined) return value
         break
@@ -170,6 +172,9 @@ class Container {
         break
       case 'factory':
         if (factory !== undefined) cacheItem(() => factory())
+        break
+      case 'cache':
+        if (cache !== undefined) return cache
         break
       default:
         if (singleton && cache !== undefined) return cache
