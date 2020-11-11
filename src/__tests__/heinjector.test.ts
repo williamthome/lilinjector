@@ -3,6 +3,13 @@ type Factory<P> = () => P
 type Newable<P> = new (...args: any[]) => P
 type Identifier<I> = PropertyKey | Newable<I>
 type Value<P> = P | P[] | undefined
+type Registry<I, P> = Map<Identifier<I>, Payload<P>>
+type PayloadReturnType =
+  | 'value'
+  | 'array'
+  | 'newable'
+  | 'factory'
+  | 'cache'
 
 interface Property<P> {
   name: PropertyKey
@@ -15,16 +22,9 @@ interface Payload<P> {
   newable?: Newable<P>
   factory?: Factory<P>
   cache?: P | P[]
-  singleton: boolean
   noCache: boolean
+  singleton: boolean
 }
-
-type PayloadReturnType =
-  | 'value'
-  | 'array'
-  | 'newable'
-  | 'factory'
-  | 'cache'
 
 class BaseConfig<I, P> {
   constructor (protected readonly config: {
@@ -98,8 +98,6 @@ class Bind<I, P> extends BaseConfig<I, P> {
   }
 }
 
-type Registry<I, P> = Map<Identifier<I>, Payload<P>>
-
 class Container {
   private readonly _registry: Registry<any, any> = new Map()
 
@@ -107,7 +105,7 @@ class Container {
     if (this._registry.has(identifier))
       throw new Error(`Identifier ${identifier.toString()} already registered`)
 
-    const payload: Payload<P> = { singleton: true, noCache: false }
+    const payload: Payload<P> = { noCache: false, singleton: true }
     this._registry.set(identifier, payload)
 
     return new Bind<I, P>({
@@ -156,7 +154,7 @@ class Container {
     if (!registered)
       throw new Error(`Identifier ${identifier.toString()} not in registry`)
 
-    const { newable, factory, value, array, cache, singleton, noCache } = registered
+    const { value, array, newable, factory, cache, noCache, singleton } = registered
 
     const cacheItem = (creator: Factory<P>): P => {
       if (!singleton) return creator()
