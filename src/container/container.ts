@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-import { BindConfig } from '@/configs'
-import { Injectable, Inject } from '@/decorators'
-import { Factory, Identifier, Payload, PayloadReturnType, RegistryMap } from '@/protocols'
+import { BindConfig } from '../configs'
+import { Injectable, Inject } from '../decorators'
+import { Factory, Identifier, Payload, PayloadReturnType, RegistryMap } from '../protocols'
 
 export class Container {
   private _registry: RegistryMap = new Map()

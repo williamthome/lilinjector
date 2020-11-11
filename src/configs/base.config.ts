@@ -1,5 +1,5 @@
-import { Container } from '@/container'
-import { Identifier, Payload } from '@/protocols'
+import { Container } from '../container'
+import { Identifier, Payload } from '../protocols'
 
 export class BaseConfig<I, P> {
   constructor (protected readonly config: {

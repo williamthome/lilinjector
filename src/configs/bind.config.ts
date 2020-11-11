@@ -1,4 +1,4 @@
-import { Factory, Newable } from '@/protocols'
+import { Factory, Newable } from '../protocols'
 import { ArrayConfig } from './array.config'
 import { BaseConfig } from './base.config'
 import { ObjectConfig } from './object.config'
