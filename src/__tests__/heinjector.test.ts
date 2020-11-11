@@ -150,6 +150,15 @@ describe('Heinjector', () => {
       expect(array).toEqual([0, 1, 2])
     })
 
+    it('should unbind identifier', () => {
+      const container = new Container()
+
+      container.bind(0).as(0)
+      container.unbind(0)
+
+      expect(() => container.get(0)).toThrow()
+    })
+
     it('should rebind identifier', () => {
       const container = new Container()
 
