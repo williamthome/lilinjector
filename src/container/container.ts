@@ -27,6 +27,9 @@ export class Container {
     return this.unbind<I, P>(identifier).bind<I, P>(identifier)
   }
 
+  has = <I> (identifier: Identifier<I>): boolean =>
+    this._registry.has(identifier)
+
   define = <I, P> (identifier: Identifier<I>): BindConfig<I, P> => {
     const payload = this._getPayloadOrThrow<I, P>(identifier)
     return this._makeBindConfig<I, P>(identifier, payload)
