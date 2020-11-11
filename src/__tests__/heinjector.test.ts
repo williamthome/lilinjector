@@ -214,8 +214,46 @@ const createResolve = (container: Container) => {
   }
 }
 
+export const getArgumentNames = <T> (newable: Newable<T>): string[] => {
+  const RegExInsideParentheses = /[(][^)]*[)]/
+  const RegExParenthesesAndSpaces = /[()\s]/g
+  const regExValue = RegExInsideParentheses.exec(newable.toString())
+  if (!regExValue) return []
+  else return regExValue[0].replace(RegExParenthesesAndSpaces, '').split(',').map(str => str.trim())
+}
+
+const InjectDecorator = <T extends Record<string, any> | Newable<T>> (container: Container, identifier?: Identifier<T>) => {
+  return (
+    target: T,
+    propertyKey: string | symbol,
+    parameterIndex?: number
+  ): void => {
+    const key = parameterIndex !== undefined ? getArgumentNames(target as Newable<T>)[parameterIndex] : propertyKey
+
+    container.bind(identifier || key)
+
+    Object.defineProperty(parameterIndex !== undefined ? (target as Newable<T>).prototype : target, key, {
+      get: () => container.get(identifier || key),
+      set: () => new Error(`[HeinJector] Property ${key.toString()} for ${target} is readonly`)
+    })
+  }
+}
+const createInject = <T> (container: Container) => (identifier?: Identifier<T>) => InjectDecorator(container, identifier)
+
+const InjectableDecorator = <T extends Record<string, any>> (container: Container, identifier?: Identifier<T>) => {
+  return <T extends Newable<any>> (
+    target: T
+  ): T => {
+    container.bind(identifier || target).asNewable(target)
+    return target
+  }
+}
+const createInjectable = <T> (container: Container) => (identifier?: Identifier<T>) => InjectableDecorator(container, identifier)
+
 const container = new Container()
 const resolve = createResolve(container)
+const Inject = createInject(container)
+const Injectable = createInjectable(container)
 
 beforeEach(() => {
   container.clear()
@@ -291,6 +329,34 @@ describe('Heinjector', () => {
     it('should resolve', () => {
       container.bind('Foo').asNewable(class { public foo = 'foo' })
       expect(resolve<string, any>('Foo')().foo).toBe('foo')
+    })
+  })
+
+  describe('@Inject()', () => {
+    it('should inject', () => {
+      @Injectable()
+      class Foo {
+        constructor (
+          @Inject() public bar: string
+        ) { }
+
+        @Inject()
+        public foo!: string
+      }
+
+      const foo = resolve<Foo, Foo>(Foo)() as Foo
+
+      container.define('foo').as('MyFooValue').done()
+      expect(foo.foo).toBe('MyFooValue')
+
+      container.define('bar').as('MyBarValue').done()
+      expect(foo.bar).toBe('MyBarValue')
+
+      container.define('foo').as('MyBarValue').done()
+      expect(foo.foo).toBe('MyBarValue')
+
+      container.define('bar').as('MyFooValue').done()
+      expect(foo.bar).toBe('MyFooValue')
     })
   })
 })
