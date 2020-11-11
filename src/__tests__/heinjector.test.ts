@@ -104,10 +104,16 @@ class Container {
   private readonly _registry: Registry<any, any> = new Map()
 
   bind = <I, P> (identifier: Identifier<I>): Bind<I, P> => {
+    if (this._registry.has(identifier))
+      throw new Error(`Identifier ${identifier.toString()} already registered`)
+
+    const payload: Payload<P> = { singleton: true, noCache: false }
+    this._registry.set(identifier, payload)
+
     return new Bind<I, P>({
       container: this,
       identifier,
-      payload: this._add<I, P>(identifier)
+      payload
     })
   }
 
@@ -185,16 +191,6 @@ class Container {
     }
 
     throw new Error(`Payload for identifier ${identifier.toString()} is null`)
-  }
-
-  private _add = <I, P> (identifier: Identifier<I>): Payload<P> => {
-    if (this._registry.has(identifier))
-      throw new Error(`Identifier ${identifier.toString()} already registered`)
-
-    const payload: Payload<P> = { singleton: true, noCache: false }
-    this._registry.set(identifier, payload)
-
-    return payload
   }
 }
 
