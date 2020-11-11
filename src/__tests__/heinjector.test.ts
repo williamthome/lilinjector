@@ -77,7 +77,7 @@ describe('LiliNjector', () => {
   describe('resolve()', () => {
     it('should resolve', () => {
       container.bind('Foo').asNewable(class { public foo = 'foo' })
-      expect(container.resolve<string, any>('Foo').foo).toBe('foo')
+      expect(container.resolve<any>('Foo').foo).toBe('foo')
     })
   })
 

@@ -1,7 +1,7 @@
 import { Container } from '../container'
 import { Identifier, Payload } from '../protocols'
 
-export class BaseConfig<I, P> {
+export class BaseConfig<I, P = I> {
   constructor (protected readonly config: {
     readonly container: Container,
     readonly identifier: Identifier<I>,

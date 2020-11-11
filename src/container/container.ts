@@ -7,7 +7,7 @@ export class Container {
   private _registry: RegistryMap = new Map()
   private _snapshots: RegistryMap[] = []
 
-  bind = <I, P> (identifier: Identifier<I>): BindConfig<I, P> => {
+  bind = <I, P = I> (identifier: Identifier<I>): BindConfig<I, P> => {
     if (this._registry.has(identifier))
       throw new Error(`[LiliNjector] Identifier ${identifier.toString()} already registered`)
 
@@ -17,25 +17,25 @@ export class Container {
     return this._makeBindConfig<I, P>(identifier, payload)
   }
 
-  unbind = <I, P> (identifier: Identifier<I>): Container => {
+  unbind = <I, P = I> (identifier: Identifier<I>): Container => {
     this._getPayloadOrThrow<I, P>(identifier)
     this._registry.delete(identifier)
     return this
   }
 
-  rebind = <I, P> (identifier: Identifier<I>): BindConfig<I, P> => {
+  rebind = <I, P = I> (identifier: Identifier<I>): BindConfig<I, P> => {
     return this.unbind<I, P>(identifier).bind<I, P>(identifier)
   }
 
   has = <I> (identifier: Identifier<I>): boolean =>
     this._registry.has(identifier)
 
-  define = <I, P> (identifier: Identifier<I>): BindConfig<I, P> => {
+  define = <I, P = I> (identifier: Identifier<I>): BindConfig<I, P> => {
     const payload = this._getPayloadOrThrow<I, P>(identifier)
     return this._makeBindConfig<I, P>(identifier, payload)
   }
 
-  override = <I, P> (identifier: Identifier<I>, payload: Payload<P>): Container => {
+  override = <I, P = I> (identifier: Identifier<I>, payload: Payload<P>): Container => {
     this._getPayloadOrThrow<I, P>(identifier)
     this._registry.set(identifier, payload)
     return this
@@ -114,13 +114,13 @@ export class Container {
 
   createInjectableDecorator = <T> (identifier?: Identifier<T>) => Injectable<T>(this, identifier)
 
-  private _getPayloadOrThrow = <I, P> (identifier: Identifier<I>): Payload<P> => {
+  private _getPayloadOrThrow = <I, P = I> (identifier: Identifier<I>): Payload<P> => {
     const registered = this._registry.get(identifier)
     if (!registered) throw new Error(`[LiliNjector] Identifier ${identifier.toString()} not in registry`)
     return registered
   }
 
-  private _makeBindConfig = <I, P> (identifier: Identifier<I>, payload: Payload<P>): BindConfig<I, P> =>
+  private _makeBindConfig = <I, P = I> (identifier: Identifier<I>, payload: Payload<P>): BindConfig<I, P> =>
     new BindConfig<I, P>({
       container: this,
       identifier,

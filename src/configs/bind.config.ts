@@ -3,7 +3,7 @@ import { ArrayConfig } from './array.config'
 import { BaseConfig } from './base.config'
 import { ObjectConfig } from './object.config'
 
-export class BindConfig<I, P> extends BaseConfig<I, P> {
+export class BindConfig<I, P = I> extends BaseConfig<I, P> {
   as = (value: P): ObjectConfig<I, P> => {
     this.config.oldValue = this.config.payload.value
     this.config.payload.value = value
