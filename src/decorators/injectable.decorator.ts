@@ -5,7 +5,8 @@ export const Injectable = <T extends Record<string, any>> (container: Container,
   return <T extends Newable<any>> (
     target: T
   ): T => {
-    container.bind(identifier || target).asNewable(target)
+    if (!container.has(identifier || target))
+      container.bind(identifier || target).asNewable(target)
     return target
   }
 }

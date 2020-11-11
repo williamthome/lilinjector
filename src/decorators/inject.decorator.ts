@@ -17,7 +17,8 @@ export const Inject = <T extends Record<string, any> | Newable<T>> (container: C
 
     const key = parameterIndex !== undefined ? getArgumentNames(target as Newable<T>)[parameterIndex] : propertyKey
 
-    container.bind(identifier || key)
+    if (!container.has(identifier || key))
+      container.bind(identifier || key)
 
     Object.defineProperty(parameterIndex !== undefined ? (target as Newable<T>).prototype : target, key, {
       get: () => container.resolve(identifier || key),
