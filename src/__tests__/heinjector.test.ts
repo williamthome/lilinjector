@@ -1,28 +1,28 @@
 type Any = Record<PropertyKey, any>
-type Factory<T> = () => T
-type Newable<T> = new (...args: any[]) => T
-type Identifier<T> = PropertyKey | Newable<T>
-type Value<T> = T | T[] | undefined
+type Factory<P> = () => P
+type Newable<P> = new (...args: any[]) => P
+type Identifier<I> = PropertyKey | Newable<I>
+type Value<P> = P | P[] | undefined
 
-interface Property<T> {
+interface Property<P> {
   name: PropertyKey
-  value: Value<T>
+  value: Value<P>
 }
 
-interface Payload<T> {
-  newable?: Newable<T>
-  factory?: Factory<T>
-  value?: T
-  array?: T[]
-  cache?: T | T[]
+interface Payload<P> {
+  newable?: Newable<P>
+  factory?: Factory<P>
+  value?: P
+  array?: P[]
+  cache?: P | P[]
   singleton: boolean
 }
 
 type PayloadReturnType = 'newable' | 'factory' | 'value' | 'array'
 
-class SingletonConfig<T> {
+class SingletonConfig<P> {
   constructor (
-    private readonly payload: Payload<T>
+    private readonly payload: Payload<P>
   ) { }
 
   notInSingletonScope = (): void => {
@@ -30,10 +30,10 @@ class SingletonConfig<T> {
   }
 }
 
-class ArrayConfig<T> {
+class ArrayConfig<P> {
   constructor (
-    private readonly payload: Payload<T>,
-    private readonly newValues: T[]
+    private readonly payload: Payload<P>,
+    private readonly newValues: P[]
   ) { }
 
   override = (): void => {
@@ -41,26 +41,26 @@ class ArrayConfig<T> {
   }
 }
 
-class Bind<T> {
-  constructor (private payload: Payload<T>) { }
+class Bind<P> {
+  constructor (private payload: Payload<P>) { }
 
-  asNewable = (newable: Newable<T>): SingletonConfig<T> => {
+  asNewable = (newable: Newable<P>): SingletonConfig<P> => {
     this.payload.newable = newable
-    return new SingletonConfig<T>(this.payload)
+    return new SingletonConfig<P>(this.payload)
   }
 
-  asFactory = (factory: Factory<T>): SingletonConfig<T> => {
+  asFactory = (factory: Factory<P>): SingletonConfig<P> => {
     this.payload.factory = factory
-    return new SingletonConfig<T>(this.payload)
+    return new SingletonConfig<P>(this.payload)
   }
 
-  as = (value: T): void => {
+  as = (value: P): void => {
     this.payload.value = value
   }
 
-  asArray = (...array: T[]): ArrayConfig<T> => {
+  asArray = (...array: P[]): ArrayConfig<P> => {
     this.payload.array = [...array, ...this.payload.array || []]
-    return new ArrayConfig<T>(this.payload, array)
+    return new ArrayConfig<P>(this.payload, array)
   }
 }
 
@@ -73,7 +73,7 @@ class Container {
     return new Bind(this._add<I, P>(identifier))
   }
 
-  unbind = <I> (identifier: Identifier<I>): Container => {
+  unbind = <P> (identifier: Identifier<P>): Container => {
     if (!this._registry.has(identifier))
       throw new Error(`Identifier ${identifier.toString()} not in registry`)
 
@@ -86,7 +86,7 @@ class Container {
     return this.unbind<I>(identifier).bind<I, P>(identifier)
   }
 
-  get = <T> (identifier: Identifier<T>, payloadReturnType?: PayloadReturnType): T | T[] => {
+  get = <P> (identifier: Identifier<P>, payloadReturnType?: PayloadReturnType): P | P[] => {
     const registered = this._registry.get(identifier)
 
     if (!registered)
@@ -94,7 +94,7 @@ class Container {
 
     const { newable, factory, value, array, cache, singleton } = registered
 
-    const cacheItem = (creator: Factory<T>): T => {
+    const cacheItem = (creator: Factory<P>): P => {
       if (singleton && cache) return cache
       if (!singleton) return creator()
       registered.cache = creator()
