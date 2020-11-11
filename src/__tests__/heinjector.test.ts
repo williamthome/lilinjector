@@ -246,5 +246,17 @@ describe('Heinjector', () => {
       foo = container.get('foo')
       expect(foo).toEqual(['foo', 'bar'])
     })
+
+    it('should override array', () => {
+      const container = new Container()
+
+      container.bind('foo').asArray('foo')
+      let foo = container.get('foo')
+      expect(foo).toEqual(['foo'])
+
+      container.define('foo').asArray('bar').override()
+      foo = container.get('foo')
+      expect(foo).toEqual(['bar'])
+    })
   })
 })
