@@ -3,7 +3,7 @@ type Factory<P> = () => P
 type Newable<P> = new (...args: any[]) => P
 type Identifier<I> = PropertyKey | Newable<I>
 type Value<P> = P | P[] | undefined
-type Registry<I, P> = Map<Identifier<I>, Payload<P>>
+type Registry<I = unknown, P = any> = Map<Identifier<I>, Payload<P>>
 type PayloadReturnType =
   | 'value'
   | 'array'
@@ -99,11 +99,12 @@ class Bind<I, P> extends BaseConfig<I, P> {
 }
 
 class Container {
-  private readonly _registry: Registry<any, any> = new Map()
+  private _registry: Registry = new Map()
+  private _snapshots: Registry[] = []
 
   bind = <I, P> (identifier: Identifier<I>): Bind<I, P> => {
     if (this._registry.has(identifier))
-      throw new Error(`Identifier ${identifier.toString()} already registered`)
+      throw new Error(`[HeinJector] Identifier ${identifier.toString()} already registered`)
 
     const payload: Payload<P> = { noCache: false, singleton: true }
     this._registry.set(identifier, payload)
@@ -115,44 +116,53 @@ class Container {
     })
   }
 
-  unbind = <P> (identifier: Identifier<P>): Container => {
-    if (!this._registry.has(identifier))
-      throw new Error(`Identifier ${identifier.toString()} not in registry`)
-
+  unbind = <I, P> (identifier: Identifier<I>): Container => {
+    this.get<I, P>(identifier)
     this._registry.delete(identifier)
-
     return this
   }
 
   rebind = <I, P> (identifier: Identifier<I>): Bind<I, P> => {
-    return this.unbind<I>(identifier).bind<I, P>(identifier)
+    return this.unbind<I, P>(identifier).bind<I, P>(identifier)
   }
 
   define = <I, P> (identifier: Identifier<I>): Bind<I, P> => {
-    const registered = this._registry.get(identifier)
-
-    if (!registered)
-      throw new Error(`Identifier ${identifier.toString()} not in registry`)
-
     return new Bind<I, P>({
       container: this,
       identifier,
-      payload: registered
+      payload: this.getPayloadOrThrow<I, P>(identifier)
     })
   }
 
-  override = <I, P> (identifier: Identifier<I>, payload: Payload<P>): void => {
-    if (!this._registry.has(identifier))
-      throw new Error(`Identifier ${identifier.toString()} not in registry`)
-
+  override = <I, P> (identifier: Identifier<I>, payload: Payload<P>): Container => {
+    this.get<I, P>(identifier)
     this._registry.set(identifier, payload)
+    return this
   }
 
-  get = <P> (identifier: Identifier<P>, payloadReturnType?: PayloadReturnType): P | P[] => {
-    const registered = this._registry.get(identifier)
+  snapshot (): Container {
+    this._snapshots.push(new Map(this._registry))
+    return this
+  }
 
-    if (!registered)
-      throw new Error(`Identifier ${identifier.toString()} not in registry`)
+  restore (): Container {
+    this._registry = this._snapshots.pop() || this._registry
+    return this
+  }
+
+  clear = (): Container => {
+    this._registry.clear()
+    return this
+  }
+
+  private getPayloadOrThrow = <I, P> (identifier: Identifier<I>): Payload<P> => {
+    const registered = this._registry.get(identifier)
+    if (!registered) throw new Error(`[HeinJector] Identifier ${identifier.toString()} not in registry`)
+    return registered
+  }
+
+  get = <I, P> (identifier: Identifier<I>, payloadReturnType?: PayloadReturnType): P | P[] => {
+    const registered = this.getPayloadOrThrow<I, P>(identifier)
 
     const { value, array, newable, factory, cache, noCache, singleton } = registered
 
@@ -175,7 +185,7 @@ class Container {
         if (newable !== undefined) return cacheItem(() => new newable())
         break
       case 'factory':
-        if (factory !== undefined) cacheItem(() => factory())
+        if (factory !== undefined) return cacheItem(() => factory())
         break
       case 'cache':
         if (cache !== undefined) return cache
@@ -185,18 +195,35 @@ class Container {
         if (value !== undefined) return value
         if (array !== undefined) return array
         if (newable !== undefined) return cacheItem(() => new newable())
-        if (factory !== undefined) cacheItem(() => factory())
+        if (factory !== undefined) return cacheItem(() => factory())
     }
 
     throw new Error(`Payload for identifier ${identifier.toString()} is null`)
   }
 }
 
+const createResolve = (container: Container) => {
+  return <I, P> (identifier: Identifier<I>) => {
+    let value: P | P[]
+    return (): P | P[] => {
+      if (value === undefined)
+        value = container.get<I, P>(identifier)
+
+      return value
+    }
+  }
+}
+
+const container = new Container()
+const resolve = createResolve(container)
+
+beforeEach(() => {
+  container.clear()
+})
+
 describe('Heinjector', () => {
   describe('bind()', () => {
     it('should bind identifiers', () => {
-      const container = new Container()
-
       container.bind(0).as(0).done()
       const zero = container.get(0)
       expect(zero).toBe(0)
@@ -209,8 +236,6 @@ describe('Heinjector', () => {
 
   describe('unbind()', () => {
     it('should unbind identifier', () => {
-      const container = new Container()
-
       container.bind(0).as(0).done()
       container.unbind(0)
 
@@ -220,8 +245,6 @@ describe('Heinjector', () => {
 
   describe('rebind()', () => {
     it('should rebind identifier', () => {
-      const container = new Container()
-
       container.bind(0).as(0).done()
       let zero = container.get(0)
       expect(zero).toBe(0)
@@ -234,8 +257,6 @@ describe('Heinjector', () => {
 
   describe('define()', () => {
     it('should define values', () => {
-      const container = new Container()
-
       container.bind('foo').as('foo').done()
       let foo = container.get('foo')
       expect(foo).toBe('foo')
@@ -246,8 +267,6 @@ describe('Heinjector', () => {
     })
 
     it('should push to array', () => {
-      const container = new Container()
-
       container.bind('foo').asArray('foo').done()
       let foo = container.get('foo')
       expect(foo).toEqual(['foo'])
@@ -258,8 +277,6 @@ describe('Heinjector', () => {
     })
 
     it('should override array', () => {
-      const container = new Container()
-
       container.bind('foo').asArray('foo').noCache().done()
       let foo = container.get('foo')
       expect(foo).toEqual(['foo'])
@@ -267,6 +284,13 @@ describe('Heinjector', () => {
       container.define('foo').asArray('bar').override().done()
       foo = container.get('foo')
       expect(foo).toEqual(['bar'])
+    })
+  })
+
+  describe('resolve()', () => {
+    it('should resolve', () => {
+      container.bind('Foo').asNewable(class { public foo = 'foo' })
+      expect(resolve<string, any>('Foo')().foo).toBe('foo')
     })
   })
 })
