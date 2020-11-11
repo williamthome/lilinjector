@@ -1,0 +1,1 @@
+export type Factory<P> = () => P
