@@ -16,6 +16,7 @@ interface Payload<P> {
   factory?: Factory<P>
   cache?: P | P[]
   singleton: boolean
+  noCache: boolean
 }
 
 type PayloadReturnType =
@@ -25,86 +26,75 @@ type PayloadReturnType =
   | 'factory'
   | 'cache'
 
-class SaveConfig<I, P> {
-  constructor (
-    private readonly container: Container,
-    private readonly identifier: Identifier<I>,
-    private readonly payload: Payload<P>,
-    private readonly overrideRegistry: boolean,
-    private readonly newCache?: P | P[]
-  ) { }
+class BaseConfig<I, P> {
+  constructor (protected readonly config: {
+    readonly container: Container,
+    readonly identifier: Identifier<I>,
+    readonly payload: Payload<P>,
+    oldValue?: P | P[],
+    newValue?: P | P[] | null,
+    args?: any
+  }) { }
+}
 
-  save = (): void => {
-    if (this.overrideRegistry) {
-      if (this.newCache) this.payload.cache = this.newCache
-      this.container.override(this.identifier, this.payload)
-    }
+class DoneConfig<I, P> extends BaseConfig<I, P> {
+  done = (): void => {
+    const { newValue, payload, container, identifier } = this.config
+
+    if (newValue && !payload.noCache) payload.cache = newValue
+    else if (newValue === null && payload.cache) delete payload.cache
+    container.override(identifier, payload)
   }
 }
 
-class SingletonConfig<I, P> {
-  constructor (
-    private readonly container: Container,
-    private readonly identifier: Identifier<I>,
-    private readonly payload: Payload<P>,
-    private readonly overrideRegistry: boolean
-  ) { }
+class Config<I, P> extends DoneConfig<I, P> {
+  notInSingletonScope = (): Config<I, P> => {
+    this.config.payload.singleton = false
+    return this
+  }
 
-  notInSingletonScope = (): void => {
-    this.payload.singleton = false
-    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry).save()
+  noCache = (): Config<I, P> => {
+    this.config.payload.noCache = true
+    return this
   }
 }
 
-class ArrayConfig<I, P> {
-  constructor (
-    private readonly container: Container,
-    private readonly identifier: Identifier<I>,
-    private readonly payload: Payload<P>,
-    private readonly newValues: P[],
-    private readonly overrideRegistry: boolean
-  ) { }
-
-  override = (): void => {
-    this.payload.array = this.newValues
-    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry, this.newValues).save()
+class ArrayConfig<I, P> extends Config<I, P> {
+  override = (): Config<I, P> => {
+    this.config.payload.array = this.config.args
+    return this
   }
 }
 
-class Bind<I, P> {
-  constructor (
-    private readonly container: Container,
-    private readonly identifier: Identifier<I>,
-    private payload: Payload<P>,
-    private readonly overrideRegistry = false
-  ) { }
-
-  as = (value: P): void => {
-    this.payload.value = value
-    this.save(value)
+class Bind<I, P> extends BaseConfig<I, P> {
+  as = (value: P): Config<I, P> => {
+    this.config.oldValue = this.config.payload.value
+    this.config.payload.value = value
+    this.config.newValue = value
+    return new Config<I, P>(this.config)
   }
 
   asArray = (...array: P[]): ArrayConfig<I, P> => {
-    const newArray = [...this.payload.array || [], ...array]
-    this.payload.array = [...this.payload.array || [], ...array]
-    this.save(newArray)
-    return new ArrayConfig<I, P>(this.container, this.identifier, this.payload, array, this.overrideRegistry)
+    this.config.oldValue = this.config.payload.value
+    const newArray = [...this.config.payload.array || [], ...array]
+    this.config.payload.array = newArray
+    this.config.newValue = newArray
+    this.config.args = array
+    return new ArrayConfig<I, P>(this.config)
   }
 
-  asNewable = (newable: Newable<P>): SingletonConfig<I, P> => {
-    this.payload.newable = newable
-    this.save()
-    return new SingletonConfig<I, P>(this.container, this.identifier, this.payload, this.overrideRegistry)
+  asNewable = (newable: Newable<P>): Config<I, P> => {
+    this.config.oldValue = this.config.payload.value
+    this.config.payload.newable = newable
+    this.config.newValue = null
+    return new Config<I, P>(this.config)
   }
 
-  asFactory = (factory: Factory<P>): SingletonConfig<I, P> => {
-    this.payload.factory = factory
-    this.save()
-    return new SingletonConfig<I, P>(this.container, this.identifier, this.payload, this.overrideRegistry)
-  }
-
-  private save = (newCache?: P | P[]): void => {
-    new SaveConfig(this.container, this.identifier, this.payload, this.overrideRegistry, newCache).save()
+  asFactory = (factory: Factory<P>): Config<I, P> => {
+    this.config.oldValue = this.config.payload.value
+    this.config.payload.factory = factory
+    this.config.newValue = null
+    return new Config<I, P>(this.config)
   }
 }
 
@@ -114,7 +104,11 @@ class Container {
   private readonly _registry: Registry<any, any> = new Map()
 
   bind = <I, P> (identifier: Identifier<I>): Bind<I, P> => {
-    return new Bind<I, P>(this, identifier, this._add<I, P>(identifier))
+    return new Bind<I, P>({
+      container: this,
+      identifier,
+      payload: this._add<I, P>(identifier)
+    })
   }
 
   unbind = <P> (identifier: Identifier<P>): Container => {
@@ -136,7 +130,11 @@ class Container {
     if (!registered)
       throw new Error(`Identifier ${identifier.toString()} not in registry`)
 
-    return new Bind<I, P>(this, identifier, registered, true)
+    return new Bind<I, P>({
+      container: this,
+      identifier,
+      payload: registered
+    })
   }
 
   override = <I, P> (identifier: Identifier<I>, payload: Payload<P>): void => {
@@ -152,12 +150,14 @@ class Container {
     if (!registered)
       throw new Error(`Identifier ${identifier.toString()} not in registry`)
 
-    const { newable, factory, value, array, cache, singleton } = registered
+    const { newable, factory, value, array, cache, singleton, noCache } = registered
 
     const cacheItem = (creator: Factory<P>): P => {
       if (!singleton) return creator()
-      registered.cache = creator()
-      return registered.cache
+
+      const cache = creator()
+      if (!noCache) registered.cache = cache
+      return cache
     }
 
     switch (payloadReturnType) {
@@ -191,7 +191,7 @@ class Container {
     if (this._registry.has(identifier))
       throw new Error(`Identifier ${identifier.toString()} already registered`)
 
-    const payload: Payload<P> = { singleton: true }
+    const payload: Payload<P> = { singleton: true, noCache: false }
     this._registry.set(identifier, payload)
 
     return payload
@@ -203,11 +203,11 @@ describe('Heinjector', () => {
     it('should bind identifiers', () => {
       const container = new Container()
 
-      container.bind(0).as(0)
+      container.bind(0).as(0).done()
       const zero = container.get(0)
       expect(zero).toBe(0)
 
-      container.bind('array').asArray(0, 1, 2)
+      container.bind('array').asArray(0, 1, 2).done()
       const array = container.get('array')
       expect(array).toEqual([0, 1, 2])
     })
@@ -217,7 +217,7 @@ describe('Heinjector', () => {
     it('should unbind identifier', () => {
       const container = new Container()
 
-      container.bind(0).as(0)
+      container.bind(0).as(0).done()
       container.unbind(0)
 
       expect(() => container.get(0)).toThrow()
@@ -228,11 +228,11 @@ describe('Heinjector', () => {
     it('should rebind identifier', () => {
       const container = new Container()
 
-      container.bind(0).as(0)
+      container.bind(0).as(0).done()
       let zero = container.get(0)
       expect(zero).toBe(0)
 
-      container.rebind(0).asArray(0, 0, 0)
+      container.rebind(0).asArray(0, 0, 0).done()
       zero = container.get(0)
       expect(zero).toEqual([0, 0, 0])
     })
@@ -242,11 +242,11 @@ describe('Heinjector', () => {
     it('should define values', () => {
       const container = new Container()
 
-      container.bind('foo').as('foo')
+      container.bind('foo').as('foo').done()
       let foo = container.get('foo')
       expect(foo).toBe('foo')
 
-      container.define('foo').as('bar')
+      container.define('foo').as('bar').done()
       foo = container.get('foo')
       expect(foo).toBe('bar')
     })
@@ -254,11 +254,11 @@ describe('Heinjector', () => {
     it('should push to array', () => {
       const container = new Container()
 
-      container.bind('foo').asArray('foo')
+      container.bind('foo').asArray('foo').done()
       let foo = container.get('foo')
       expect(foo).toEqual(['foo'])
 
-      container.define('foo').asArray('bar')
+      container.define('foo').asArray('bar').done()
       foo = container.get('foo')
       expect(foo).toEqual(['foo', 'bar'])
     })
@@ -266,11 +266,11 @@ describe('Heinjector', () => {
     it('should override array', () => {
       const container = new Container()
 
-      container.bind('foo').asArray('foo')
+      container.bind('foo').asArray('foo').noCache().done()
       let foo = container.get('foo')
       expect(foo).toEqual(['foo'])
 
-      container.define('foo').asArray('bar').override()
+      container.define('foo').asArray('bar').override().done()
       foo = container.get('foo')
       expect(foo).toEqual(['bar'])
     })
