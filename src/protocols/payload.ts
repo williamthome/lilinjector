@@ -10,3 +10,10 @@ export interface Payload<P> {
   noCache: boolean
   singleton: boolean
 }
+
+export type PayloadReturnType =
+  | 'value'
+  | 'array'
+  | 'newable'
+  | 'factory'
+  | 'cache'
