@@ -1,7 +1,7 @@
 /* eslint-disable @typescript-eslint/explicit-module-boundary-types */
 import { BindConfig } from '../configs'
-import { Injectable, Inject } from '../decorators'
-import { Factory, Identifier, Payload, PayloadReturnType, RegistryMap } from '../protocols'
+import { Injectable, Inject, InjectableArray } from '../decorators'
+import { Factory, Identifier, Newable, Payload, PayloadReturnType, RegistryMap } from '../protocols'
 
 export class Container {
   private _registry: RegistryMap = new Map()
@@ -29,6 +29,9 @@ export class Container {
 
   has = <I> (identifier: Identifier<I>): boolean =>
     this._registry.has(identifier)
+
+  get = <I, P = I> (identifier: Identifier<I>): Payload<P> | undefined =>
+    this._registry.get(identifier)
 
   define = <I, P = I> (identifier: Identifier<I>): BindConfig<I, P> => {
     const payload = this._getPayloadOrThrow<I, P>(identifier)
@@ -73,14 +76,30 @@ export class Container {
   resolveAny = <I, P = I> (identifier: Identifier<I>, payloadReturnType?: PayloadReturnType): P | P[] => {
     const registered = this._getPayloadOrThrow<I, P>(identifier)
 
-    const { value, array, newable, factory, cache, noCache, singleton } = registered
+    const { value, array, newable, newableArray, factory, factoryArray, cache, noCache, singleton } = registered
 
-    const cacheItem = (creator: Factory<P>): P => {
+    const cacheOrCreate = (creator: Factory<P>): P => {
       if (!singleton) return creator()
 
       const cache = creator()
       if (!noCache) registered.cache = cache
       return cache
+    }
+
+    const makeNewableArray = (array: Newable<P>[]): P[] => {
+      const nArray: P[] = []
+      for (const n of array) {
+        nArray.push(cacheOrCreate(() => new n()))
+      }
+      return nArray
+    }
+
+    const makeFactoryArray = (array: Factory<P>[]): P[] => {
+      const fArray: P[] = []
+      for (const f of array) {
+        fArray.push(cacheOrCreate(() => f()))
+      }
+      return fArray
     }
 
     switch (payloadReturnType) {
@@ -91,10 +110,16 @@ export class Container {
         if (array !== undefined) return array
         break
       case 'newable':
-        if (newable !== undefined) return cacheItem(() => new newable())
+        if (newable !== undefined) return cacheOrCreate(() => new newable())
+        break
+      case 'newableArray':
+        if (newableArray !== undefined) return makeNewableArray(newableArray)
         break
       case 'factory':
-        if (factory !== undefined) return cacheItem(() => factory())
+        if (factory !== undefined) return cacheOrCreate(() => factory())
+        break
+      case 'factoryArray':
+        if (factoryArray !== undefined) return makeFactoryArray(factoryArray)
         break
       case 'cache':
         if (cache !== undefined) return cache
@@ -103,8 +128,10 @@ export class Container {
         if (singleton && cache !== undefined) return cache
         if (value !== undefined) return value
         if (array !== undefined) return array
-        if (newable !== undefined) return cacheItem(() => new newable())
-        if (factory !== undefined) return cacheItem(() => factory())
+        if (newable !== undefined) return cacheOrCreate(() => new newable())
+        if (newableArray !== undefined) return makeNewableArray(newableArray)
+        if (factory !== undefined) return cacheOrCreate(() => factory())
+        if (factoryArray !== undefined) return makeFactoryArray(factoryArray)
     }
 
     throw new Error(`[LiliNjector] Payload for identifier ${identifier.toString()} is null`)
@@ -113,6 +140,8 @@ export class Container {
   createInjectDecorator = <T> (identifier?: Identifier<T>) => Inject<T>(this, identifier)
 
   createInjectableDecorator = <T> (identifier?: Identifier<T>) => Injectable<T>(this, identifier)
+
+  createInjectableArrayDecorator = <T> (identifier?: Identifier<T>) => InjectableArray<T>(this, identifier)
 
   private _getPayloadOrThrow = <I, P = I> (identifier: Identifier<I>): Payload<P> => {
     const registered = this._registry.get(identifier)
