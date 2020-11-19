@@ -93,6 +93,13 @@ describe('LiliNjector', () => {
 
   describe('@InjectableArray()', () => {
     it('should inject class array and resolve', () => {
+      @Injectable()
+      class Server {
+        constructor (
+          @Inject('routes') public readonly routes: any[]
+        ) { }
+      }
+
       @InjectableArray('routes')
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       class FooRoute { }
@@ -101,9 +108,8 @@ describe('LiliNjector', () => {
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       class BarRoute { }
 
-      const routes = container.resolveArray('routes')
-
-      expect(routes.length).toBe(2)
+      const webServer = container.resolve(Server)
+      expect(webServer.routes.length).toBe(2)
     })
   })
 
