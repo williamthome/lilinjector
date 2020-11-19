@@ -1,12 +1,11 @@
+import { InjectableConfig } from '../configs'
 import { Container } from '../container'
 import { Identifier, Newable } from '../protocols'
 
-export const Injectable = <T extends Record<string, any>> (container: Container, identifier?: Identifier<T>) => {
-  return <T extends Newable<any>> (
-    target: T
-  ): T => {
-    if (!container.has(identifier || target))
-      container.bind(identifier || target).asNewable(target)
-    return target
+export const Injectable = <TIdentifier extends Record<string, any>> (container: Container, identifier?: Identifier<TIdentifier>) => {
+  return <TTarget extends Newable<any>> (
+    target: TTarget
+  ): TTarget => {
+    return new InjectableConfig<TIdentifier, TTarget>(target, container, identifier).asNewable()
   }
 }
