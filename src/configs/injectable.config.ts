@@ -1,5 +1,5 @@
-import { Container } from 'src/container'
-import { Identifier, Newable } from 'src/protocols'
+import { Container } from '../container'
+import { Identifier, Newable } from '../protocols'
 
 export class InjectableConfig<TIdentifier extends Record<string, any>, TTarget extends Newable<any>> {
 
