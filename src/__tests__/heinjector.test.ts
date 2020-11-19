@@ -3,6 +3,7 @@ import { Container } from '../container'
 const container = new Container()
 const Inject = container.createInjectDecorator
 const Injectable = container.createInjectableDecorator
+const InjectableArray = container.createInjectableArrayDecorator
 
 beforeEach(() => {
   container.clear()
@@ -81,9 +82,34 @@ describe('LiliNjector', () => {
     })
   })
 
+  describe('@Injectable()', () => {
+    it('should inject class and resolve', () => {
+      @Injectable<Foo>()
+      class Foo { }
+
+      expect(container.resolve(Foo)).toBeTruthy()
+    })
+  })
+
+  describe('@InjectableArray()', () => {
+    it('should inject class array and resolve', () => {
+      @InjectableArray('routes')
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      class FooRoute { }
+
+      @InjectableArray('routes')
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      class BarRoute { }
+
+      const routes = container.resolveArray('routes')
+
+      expect(routes.length).toBe(2)
+    })
+  })
+
   describe('@Inject()', () => {
     it('should inject', () => {
-      @Injectable()
+      @Injectable<Foo>()
       class Foo {
         constructor (
           @Inject() public bar: string
