@@ -91,6 +91,7 @@ export class Container {
       for (const n of array) {
         nArray.push(cacheOrCreate(() => new n()))
       }
+      if (!noCache) registered.cache = nArray
       return nArray
     }
 
@@ -99,6 +100,7 @@ export class Container {
       for (const f of array) {
         fArray.push(cacheOrCreate(() => f()))
       }
+      if (!noCache) registered.cache = fArray
       return fArray
     }
 
