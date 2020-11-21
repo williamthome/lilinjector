@@ -57,6 +57,23 @@ describe('LiliNjector', () => {
     })
   })
 
+  describe('clear()', () => {
+    it('should clear', () => {
+      container.bind('foo')
+      container.clear()
+      expect(container.has('foo')).toBeFalsy()
+    })
+
+    it('should not clear if pinned', () => {
+      container.define('foo').as('foo').pinned().done()
+      container.clear()
+      expect(container.has('foo')).toBeTruthy()
+      container.unpin('foo')
+      container.clear()
+      expect(container.has('foo')).toBeFalsy()
+    })
+  })
+
   describe('resolve()', () => {
     it('should resolve', () => {
       container.define('Foo').asNewable(class { public foo = 'foo' })
