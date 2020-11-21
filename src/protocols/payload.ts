@@ -12,6 +12,7 @@ export interface Payload<P> {
   cache?: P | P[]
   noCache: boolean
   singleton: boolean
+  pinned: boolean
 }
 
 export type PayloadReturnType =

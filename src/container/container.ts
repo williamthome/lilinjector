@@ -11,7 +11,7 @@ export class Container {
     if (this._registry.has(identifier))
       return this.rebind(identifier)
 
-    const payload: Payload<P> = { noCache: false, singleton: true }
+    const payload: Payload<P> = { noCache: false, singleton: true, pinned: false }
     this._registry.set(identifier, payload)
 
     return this
@@ -44,6 +44,20 @@ export class Container {
     return this
   }
 
+  pin = <I, P = I> (identifier: Identifier<I>): Container => {
+    const payload = this._getPayloadOrThrow<I, P>(identifier)
+    payload.pinned = true
+    this._registry.set(identifier, payload)
+    return this
+  }
+
+  unpin = <I, P = I> (identifier: Identifier<I>): Container => {
+    const payload = this._getPayloadOrThrow<I, P>(identifier)
+    payload.pinned = false
+    this._registry.set(identifier, payload)
+    return this
+  }
+
   snapshot (): Container {
     this._snapshots.push(new Map(this._registry))
     return this
@@ -55,7 +69,9 @@ export class Container {
   }
 
   clear = (): Container => {
-    this._registry.clear()
+    this._registry.forEach((payload, identifier) => {
+      if (!payload.pinned) this._registry.delete(identifier)
+    })
     return this
   }
 

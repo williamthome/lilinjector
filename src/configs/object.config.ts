@@ -10,4 +10,9 @@ export class ObjectConfig<I, P = I> extends DoneConfig<I, P> {
     this.config.payload.noCache = true
     return this
   }
+
+  pinned = (): ObjectConfig<I, P> => {
+    this.config.payload.pinned = true
+    return this
+  }
 }
