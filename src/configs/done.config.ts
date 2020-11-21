@@ -1,4 +1,4 @@
-import { Container } from 'src/container'
+import { Container } from '../container'
 import { BaseConfig } from './base.config'
 
 export class DoneConfig<I, P = I> extends BaseConfig<I, P> {
