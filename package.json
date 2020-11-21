@@ -1,6 +1,6 @@
 {
   "name": "lilinjector",
-  "version": "0.0.7",
+  "version": "0.0.8",
   "description": "Simple dependency injector",
   "repository": {
     "type": "git",
