@@ -13,7 +13,7 @@ export class InjectableConfig<TIdentifier extends Record<string, any>, TTarget e
     if (this.container.has(this._identifier)) {
       this.container.define<TIdentifier, TTarget>(this._identifier).asNewable(this.target).done()
     } else {
-      this.container.bind(this._identifier).asNewable(this.target).done()
+      this.container.define(this._identifier).asNewable(this.target).done()
     }
     return this.target
   }
@@ -22,7 +22,7 @@ export class InjectableConfig<TIdentifier extends Record<string, any>, TTarget e
     if (this.container.has(this._identifier)) {
       this.container.define<TIdentifier, TTarget>(this._identifier).asNewableArray(this.target).done()
     } else {
-      this.container.bind(this._identifier).asNewableArray(this.target).done()
+      this.container.define(this._identifier).asNewableArray(this.target).done()
     }
     return this.target
   }

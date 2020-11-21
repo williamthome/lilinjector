@@ -7,14 +7,18 @@ export class Container {
   private _registry: RegistryMap = new Map()
   private _snapshots: RegistryMap[] = []
 
-  bind = <I, P = I> (identifier: Identifier<I>): BindConfig<I, P> => {
+  bind = <I, P = I> (identifier: Identifier<I>): Container => {
     if (this._registry.has(identifier))
-      throw new Error(`[LiliNjector] Identifier ${identifier.toString()} already registered`)
+      return this.rebind(identifier)
 
     const payload: Payload<P> = { noCache: false, singleton: true }
     this._registry.set(identifier, payload)
 
-    return this._makeBindConfig<I, P>(identifier, payload)
+    return this
+  }
+
+  private rebind = <I, P = I> (identifier: Identifier<I>): Container => {
+    return this.unbind<I, P>(identifier).bind<I, P>(identifier)
   }
 
   unbind = <I, P = I> (identifier: Identifier<I>): Container => {
@@ -23,17 +27,13 @@ export class Container {
     return this
   }
 
-  rebind = <I, P = I> (identifier: Identifier<I>): BindConfig<I, P> => {
-    return this.unbind<I, P>(identifier).bind<I, P>(identifier)
-  }
-
   has = <I> (identifier: Identifier<I>): boolean =>
     this._registry.has(identifier)
 
-  get = <I, P = I> (identifier: Identifier<I>): Payload<P> | undefined =>
-    this._registry.get(identifier)
-
   define = <I, P = I> (identifier: Identifier<I>): BindConfig<I, P> => {
+    if (!this.has(identifier))
+      this.bind(identifier)
+
     const payload = this._getPayloadOrThrow<I, P>(identifier)
     return this._makeBindConfig<I, P>(identifier, payload)
   }

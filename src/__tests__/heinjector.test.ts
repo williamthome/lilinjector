@@ -11,41 +11,23 @@ beforeEach(() => {
 
 describe('LiliNjector', () => {
   describe('bind()', () => {
-    it('should bind identifiers', () => {
-      container.bind(0).as(0).done()
-      const zero = container.resolve(0)
-      expect(zero).toBe(0)
-
-      container.bind('array').asArray(0, 1, 2).done()
-      const array = container.resolveArray('array')
-      expect(array).toEqual([0, 1, 2])
+    it('should bind identifier', () => {
+      container.bind('foo')
+      expect(container.has('foo')).toBeTruthy()
     })
   })
 
   describe('unbind()', () => {
     it('should unbind identifier', () => {
-      container.bind(0).as(0).done()
-      container.unbind(0)
-
-      expect(() => container.resolve(0)).toThrow()
-    })
-  })
-
-  describe('rebind()', () => {
-    it('should rebind identifier', () => {
-      container.bind(0).as(0).done()
-      let zero = container.resolve(0)
-      expect(zero).toBe(0)
-
-      container.rebind(0).asArray(0, 0, 0).done()
-      zero = container.resolveArray(0)
-      expect(zero).toEqual([0, 0, 0])
+      container.bind('foo')
+      container.unbind('foo')
+      expect(container.has('foo')).toBeFalsy()
     })
   })
 
   describe('define()', () => {
     it('should define values', () => {
-      container.bind('foo').as('foo').done()
+      container.define('foo').as('foo').done()
       let foo = container.resolve('foo')
       expect(foo).toBe('foo')
 
@@ -55,7 +37,7 @@ describe('LiliNjector', () => {
     })
 
     it('should push to array', () => {
-      container.bind('foo').asArray('foo').done()
+      container.define('foo').asArray('foo').done()
       let foo = container.resolveArray('foo')
       expect(foo).toEqual(['foo'])
 
@@ -65,7 +47,7 @@ describe('LiliNjector', () => {
     })
 
     it('should override array', () => {
-      container.bind('foo').asArray('foo').noCache().done()
+      container.define('foo').asArray('foo').noCache().done()
       let foo = container.resolveArray('foo')
       expect(foo).toEqual(['foo'])
 
@@ -77,7 +59,7 @@ describe('LiliNjector', () => {
 
   describe('resolve()', () => {
     it('should resolve', () => {
-      container.bind('Foo').asNewable(class { public foo = 'foo' })
+      container.define('Foo').asNewable(class { public foo = 'foo' })
       expect(container.resolve<any>('Foo').foo).toBe('foo')
     })
   })
